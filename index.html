@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Orbital Dice Simulator</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap"
+            rel="stylesheet"
+        />
+        <link rel="stylesheet" href="style.css" />
+    </head>
+    <body>
+        <main class="app">
+            <h1>Orbital Dice Simulator</h1>
+            <p class="subtitle">
+                A satellite tumbles around Earth while your dice settle in
+                zero-g style.
+            </p>
+
+            <section class="sim-card">
+                <canvas
+                    id="simCanvas"
+                    width="760"
+                    height="760"
+                    aria-label="Dice simulation canvas"
+                ></canvas>
+
+                <div class="controls">
+                    <button id="rollBtn" type="button">Roll Dice</button>
+                    <div class="readout">
+                        <span>Result:</span>
+                        <strong id="resultText">-</strong>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <script src="https://cdn.jsdelivr.net/npm/matter-js@0.19.0/build/matter.min.js"></script>
+        <script src="script.js"></script>
+    </body>
+</html>
+<!-- Matter.js added above script.js by automation -->

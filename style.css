@@ -1,0 +1,105 @@
+:root {
+  --bg-1: #020817;
+  --bg-2: #0b1736;
+  --panel: rgba(8, 23, 51, 0.82);
+  --panel-border: rgba(138, 180, 255, 0.3);
+  --text: #e6f0ff;
+  --muted: #9eb5de;
+  --accent: #7dd3fc;
+  --accent-2: #38bdf8;
+  --button-text: #071226;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Space Grotesk", sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(1200px 800px at 12% 8%, rgba(56, 189, 248, 0.2), transparent 62%),
+    radial-gradient(1000px 1000px at 86% 90%, rgba(147, 197, 253, 0.12), transparent 56%),
+    linear-gradient(155deg, var(--bg-1), var(--bg-2));
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.app {
+  width: min(960px, 100%);
+  text-align: center;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(1.8rem, 4vw, 3rem);
+  letter-spacing: 0.03em;
+}
+
+.subtitle {
+  margin: 0.5rem auto 1.3rem;
+  color: var(--muted);
+  max-width: 56ch;
+}
+
+.sim-card {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 26px;
+  padding: 1rem;
+  box-shadow: 0 20px 50px rgba(3, 10, 26, 0.55);
+  backdrop-filter: blur(7px);
+}
+
+#simCanvas {
+  display: block;
+  width: min(92vw, 760px);
+  aspect-ratio: 1 / 1;
+  margin-inline: auto;
+  border-radius: 20px;
+  border: 1px solid rgba(173, 208, 255, 0.25);
+  background: rgba(2, 8, 23, 0.7);
+}
+
+.controls {
+  margin-top: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.8rem 1.2rem;
+}
+
+button {
+  font: inherit;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: var(--button-text);
+  border: none;
+  border-radius: 12px;
+  padding: 0.75rem 1.2rem;
+  cursor: pointer;
+  transition: transform 160ms ease, filter 160ms ease;
+}
+
+button:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+
+button:active {
+  transform: translateY(1px) scale(0.99);
+}
+
+.readout {
+  font-size: 1.05rem;
+  color: var(--muted);
+}
+
+.readout strong {
+  margin-left: 0.35rem;
+  color: var(--text);
+}
