@@ -22,8 +22,8 @@ const world = {
     h: logicalSize,
     cx: logicalSize / 2,
     cy: logicalSize / 2,
-    arenaRadius: logicalSize * 0.36,
-    diceCount: 5,
+    arenaRadius: logicalSize * 0.44,
+    diceColors: ["#ffb000", "#fe6100", "#dc267f", "#785ef0", "#648fff"],
     diceRadius: 32,
     earthOrbitRadius: logicalSize * 0.48,
     // slower orbit for a gentler rotation
@@ -77,9 +77,6 @@ const pipPatterns = {
     ],
 };
 
-// Palette for the five dice (provided by user)
-const diceColors = ["#ffb000", "#fe6100", "#dc267f", "#785ef0", "#648fff"];
-
 // Matter.js setup (provided by CDN in index.html)
 const { Engine, Composite, Bodies, Body } = Matter;
 const engine = Engine.create();
@@ -94,8 +91,9 @@ engine.constraintIterations = 4;
 const dice = [];
 const dieSize = world.diceRadius * 2;
 const initialOrbit = world.arenaRadius * 0.48;
-for (let i = 0; i < world.diceCount; i += 1) {
-    const angle = (Math.PI * 2 * i) / world.diceCount;
+const diceCount = world.diceColors.length;
+for (let i = 0; i < diceCount; i += 1) {
+    const angle = (Math.PI * 2 * i) / diceCount;
     const x = world.cx + Math.cos(angle) * initialOrbit;
     const y = world.cy + Math.sin(angle) * initialOrbit;
 
@@ -105,6 +103,7 @@ for (let i = 0; i < world.diceCount; i += 1) {
         frictionAir: 0.06,
         density: 0.002,
     });
+
     // set initial random orientation explicitly
     Body.setAngle(body, Math.random() * Math.PI * 2);
 
@@ -113,10 +112,8 @@ for (let i = 0; i < world.diceCount; i += 1) {
     dice.push({
         body,
         value: 1 + Math.floor(Math.random() * 6),
-        displayValue: 1 + Math.floor(Math.random() * 6),
-        targetValue: null,
         nextFaceChangeAt: 0,
-        color: diceColors[i % diceColors.length],
+        color: world.diceColors[i % world.diceColors.length],
         lastArmHitAt: 0,
     });
 }
@@ -124,6 +121,33 @@ for (let i = 0; i < world.diceCount; i += 1) {
 // finalize arm dimensions now that die size is known
 world.arm.length = world.arenaRadius; // equal to arena radius as requested
 world.arm.thickness = dieSize / 2; // half the width of a die
+
+// create a dynamic physics body for the arm and pin one end to the arena center
+// so it behaves like a motor-driven clock arm (one end at center, other at edge)
+{
+    const a = world.arm.angle;
+    const halfLen = world.arm.length / 2;
+    // place the arm body's center at the correct offset so one end is at the pivot
+    const cx = world.cx + Math.cos(a) * halfLen;
+    const cy = world.cy + Math.sin(a) * halfLen;
+
+    // create a static body and we'll manually set its angle/position each frame
+    const armBody = Bodies.rectangle(
+        cx,
+        cy,
+        world.arm.length,
+        world.arm.thickness,
+        {
+            isStatic: true,
+            restitution: 0.6,
+            friction: 0.02,
+        },
+    );
+    Composite.add(engine.world, armBody);
+
+    world.arm.body = armBody;
+    world.arm.motorSpeed = 3; // radians/sec
+}
 
 // Create an approximated circular ring made from many static segments
 // so dice can stay inside without colliding with a filled circle.
@@ -146,41 +170,6 @@ for (let i = 0; i < wallCount; i += 1) {
 
 // Define an enforcement radius (inner usable area) to nudge dice inside
 const boundaryRadius = world.arenaRadius - world.diceRadius - 1.5;
-
-// helper: clamp and nudge dice back inside the arena to prevent ejection
-function enforceArena(die) {
-    const pos = die.body.position;
-    const dx = pos.x - world.cx;
-    const dy = pos.y - world.cy;
-    const dist = Math.hypot(dx, dy);
-    const max = boundaryRadius - world.diceRadius * 0.5;
-    if (dist > max) {
-        const nx = dx / dist || 0;
-        const ny = dy / dist || 0;
-        // place slightly inside and reduce velocity to avoid bounce-out
-        Body.setPosition(die.body, {
-            x: world.cx + nx * max,
-            y: world.cy + ny * max,
-        });
-        Body.setVelocity(die.body, {
-            x: die.body.velocity.x * 0.28,
-            y: die.body.velocity.y * 0.28,
-        });
-        Body.setAngularVelocity(die.body, die.body.angularVelocity * 0.35);
-    }
-}
-
-function randomizeEnergies(base = 260) {
-    dice.forEach((die) => {
-        const b = die.body;
-        // reduce initial momentum: lower speedScale so initial impulses are gentler
-        const speedScale = 0.012;
-        const vx = (Math.random() - 0.5) * base * speedScale;
-        const vy = (Math.random() - 0.5) * base * speedScale;
-        Body.setVelocity(b, { x: vx, y: vy });
-        Body.setAngularVelocity(b, (Math.random() - 0.5) * 3.2);
-    });
-}
 
 function drawSpaceBackdrop() {
     ctx.save();
@@ -267,7 +256,7 @@ function drawArena() {
 function drawDie(die) {
     const size = world.diceRadius * 2;
     const corner = 8;
-    const pattern = pipPatterns[die.displayValue ?? die.value];
+    const pattern = pipPatterns[die.value];
 
     const pos = die.body.position;
     const ang = die.body.angle;
@@ -315,37 +304,6 @@ function applyMotion(dt) {
     // Step Matter engine (Engine.update expects ms)
     Engine.update(engine, dt * 1000);
 
-    // Stabilize tiny velocities to prevent perpetual micro-jitter
-    dice.forEach((die) => {
-        const v = die.body.velocity;
-        const speed = Math.hypot(v.x, v.y);
-        const maxSpeed = 6.0;
-        if (speed > maxSpeed) {
-            // clamp very large velocities
-            Body.setVelocity(die.body, {
-                x: (v.x / speed) * maxSpeed,
-                y: (v.y / speed) * maxSpeed,
-            });
-        } else if (
-            (world.state === "settling" || world.allowFinalize) &&
-            speed < 0.6
-        ) {
-            Body.setVelocity(die.body, { x: 0, y: 0 });
-        } else if (speed < 0.02) {
-            Body.setVelocity(die.body, { x: 0, y: 0 });
-        }
-
-        const av = die.body.angularVelocity;
-        if (
-            (world.state === "settling" || world.allowFinalize) &&
-            Math.abs(av) < 0.03
-        ) {
-            Body.setAngularVelocity(die.body, 0);
-        } else if (Math.abs(av) < 0.002) {
-            Body.setAngularVelocity(die.body, 0);
-        }
-    });
-
     if (world.state === "rolling" && now >= world.rollEndAt) {
         world.state = "settling";
     }
@@ -362,16 +320,12 @@ function applyMotion(dt) {
                 Math.abs(d.body.angularVelocity) < 0.06
             );
         });
-        const facesSettled = dice.every(
-            (d) => d.displayValue === d.targetValue,
-        );
         const forcedTimeout = now >= world.settleEndAt + 5.0;
 
-        if ((calm && facesSettled) || forcedTimeout) {
+        if (calm || forcedTimeout) {
             world.state = "stopped";
             let total = 0;
             dice.forEach((die) => {
-                die.value = die.displayValue ?? die.value;
                 total += die.value;
             });
             resultText.textContent = `${dice.map((d) => d.value).join(" + ")} = ${total}`;
@@ -386,39 +340,39 @@ function easeOutCubic(t) {
 }
 
 function updateFaceDisplays(now) {
-    const rollStart = world.rollStart ?? world.rollEndAt - 1.5;
-    const totalDuration = Math.max(0.001, world.settleEndAt - rollStart);
-    const progress = Math.min(
-        1,
-        Math.max(0, (now - rollStart) / totalDuration),
-    );
+    // Change face display frequency based purely on each die's linear speed.
+    // High speed -> rapid random face changes. Low/standing still -> few or no changes.
+    const minInterval = 0.04; // fastest change interval (sec)
+    const maxInterval = 0.8; // slowest change interval (sec)
+    const maxSpeedForPips = 5.0;
+    const stillThreshold = 0.001; // below this speed we consider the die "still"
 
-    const minInterval = 0.04;
-    const maxInterval = 0.6;
-    const eased = easeOutCubic(progress);
-    const baseInterval = minInterval + (maxInterval - minInterval) * eased;
-
-    // Make the pip-change speed depend on each die's speed:
-    // faster dice -> smaller interval -> quicker dot changes
-    const maxSpeedForPips = 6.0;
     dice.forEach((die) => {
         const v = die.body.velocity;
         const speed = Math.hypot(v.x, v.y);
         const speedNorm = Math.max(0, Math.min(1, speed / maxSpeedForPips));
-        const perDieInterval = baseInterval * (1 - 0.85 * speedNorm);
 
-        if (!die.nextFaceChangeAt)
-            die.nextFaceChangeAt = now + Math.random() * perDieInterval;
+        if (speed < stillThreshold) {
+            return;
+        }
+
+        // Interpolate interval: high speed -> near minInterval, low speed -> near maxInterval
+        const perDieInterval =
+            minInterval + (maxInterval - minInterval) * (1 - speedNorm);
 
         if (now >= die.nextFaceChangeAt) {
-            if (progress < 0.98) {
-                die.displayValue = 1 + Math.floor(Math.random() * 6);
-            } else {
-                die.displayValue = die.targetValue ?? die.displayValue;
-            }
+            die.value = 1 + Math.floor(Math.random() * 6);
+            die.nextFaceChangeAt = 0;
+        }
 
-            die.nextFaceChangeAt =
-                now + perDieInterval * (0.7 + Math.random() * 0.6);
+        const nextFaceChange = now + perDieInterval;
+        if (die.nextFaceChangeAt === 0) {
+            die.nextFaceChangeAt = nextFaceChange;
+        } else {
+            die.nextFaceChangeAt = Math.min(
+                die.nextFaceChangeAt,
+                nextFaceChange,
+            );
         }
     });
 }
@@ -450,86 +404,48 @@ function draw() {
 }
 
 function drawArm() {
-    const a = world.arm.angle;
     const len = world.arm.length;
     const t = world.arm.thickness;
+    const body = world.arm.body;
+    if (!body) return;
 
     ctx.save();
-    ctx.translate(world.cx, world.cy);
-    ctx.rotate(a);
+    ctx.translate(body.position.x, body.position.y);
+    ctx.rotate(body.angle);
     ctx.fillStyle = "rgba(255,255,255,0.12)";
     ctx.strokeStyle = "rgba(255,255,255,0.22)";
     ctx.lineWidth = 2;
-    // draw rectangle arm from center outward
+    // draw rectangle centered on body (body is centered at half-length)
     ctx.beginPath();
-    ctx.moveTo(0, -t / 2);
-    ctx.lineTo(len, -t / 2);
-    ctx.lineTo(len, t / 2);
-    ctx.lineTo(0, t / 2);
-    ctx.closePath();
+    ctx.rect(-len / 2, -t / 2, len, t);
     ctx.fill();
     ctx.stroke();
     ctx.restore();
 }
 
 function updateArm(dt) {
-    // integrate spin
     const arm = world.arm;
-    if (Math.abs(arm.spinVel) > 0.0001) {
-        arm.angle += arm.spinVel * dt;
-        // decay spin velocity
-        const decayRate = 3.0; // seconds to slow down
-        arm.spinVel -= arm.spinVel * decayRate * dt;
+    const halfLen = arm.length / 2;
 
-        // check collisions with dice
-        const now = world.time;
-        const armDir = { x: Math.cos(arm.angle), y: Math.sin(arm.angle) };
+    if (world.time <= world.rollEndAt) {
+        const currentAngle = arm.body.angle;
+        const nextAngle = currentAngle + arm.motorSpeed * dt;
 
-        dice.forEach((die) => {
-            const pos = die.body.position;
-            const dx = pos.x - world.cx;
-            const dy = pos.y - world.cy;
-            // projection length along arm (0..len)
-            const proj = dx * armDir.x + dy * armDir.y;
-            const clamped = Math.max(0, Math.min(arm.length, proj));
-            const closestX = world.cx + armDir.x * clamped;
-            const closestY = world.cy + armDir.y * clamped;
-            const dist = Math.hypot(pos.x - closestX, pos.y - closestY);
+        const halfLen = world.arm.length / 2;
+        const nextX = world.cx + Math.cos(nextAngle) * halfLen;
+        const nextY = world.cy + Math.sin(nextAngle) * halfLen;
 
-            const hitRadius = world.diceRadius + arm.thickness / 2;
-            const hitCooldown = 0.12;
-            if (
-                dist <= hitRadius &&
-                now - (die.lastArmHitAt || 0) > hitCooldown
-            ) {
-                die.lastArmHitAt = now;
+        const velX = (nextX - arm.body.position.x) / dt / 100;
+        const velY = (nextY - arm.body.position.y) / dt / 100;
 
-                // impart tangential impulse based on spin velocity
-                // tangential is perpendicular to armDir
-                const tang = { x: -armDir.y, y: armDir.x };
-                // direction sign depends on spin sign
-                const sign = Math.sign(arm.spinVel) || 1;
-                const tangDir = { x: tang.x * sign, y: tang.y * sign };
+        Body.setPosition(arm.body, { x: nextX, y: nextY });
+        Body.setAngle(arm.body, nextAngle);
 
-                // compute impulse magnitude (tweak scale as needed)
-                const impulseScale = 1.5; // tuning constant
-                const impulse =
-                    Math.min(18, Math.abs(arm.spinVel)) * impulseScale;
+        console.log(`Arm velocity: (${velX.toFixed(2)}, ${velY.toFixed(2)})`);
 
-                const b = die.body;
-                // set instant velocity addition
-                Body.setVelocity(b, {
-                    x: b.velocity.x + tangDir.x * impulse,
-                    y: b.velocity.y + tangDir.y * impulse,
-                });
-
-                // add a small angular kick
-                Body.setAngularVelocity(
-                    b,
-                    b.angularVelocity + (Math.random() - 0.5) * 3 + sign * 1.2,
-                );
-            }
-        });
+        Body.setVelocity(arm.body, { x: velX, y: velY });
+    } else {
+        Body.setVelocity(arm.body, { x: 0, y: 0 });
     }
 }
 
@@ -548,24 +464,9 @@ function frame(ts) {
 rollBtn.addEventListener("click", () => {
     world.state = "rolling";
     world.rollStart = world.time;
-    world.rollEndAt = world.rollStart + 1.5;
+    world.rollEndAt = world.rollStart + 3.5;
     world.settleEndAt = world.rollEndAt + 2.1;
     world.allowFinalize = false;
-
-    dice.forEach((die) => {
-        die.targetValue = 1 + Math.floor(Math.random() * 6);
-        die.displayValue = 1 + Math.floor(Math.random() * 6);
-        die.nextFaceChangeAt = world.time + Math.random() * 0.06;
-
-        // small random nudge so dice are not perfectly aligned
-        const b = die.body;
-        Body.setAngularVelocity(b, (Math.random() - 0.5) * 4);
-    });
-    // spin the arm instead of random global impulses
-    // choose a starting spin velocity (radians/sec) and let it decay
-    const minSpin = 9;
-    const maxSpin = 16;
-    world.arm.spinVel = minSpin + Math.random() * (maxSpin - minSpin);
     resultText.textContent = "rolling...";
 });
 
