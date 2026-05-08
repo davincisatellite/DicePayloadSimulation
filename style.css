@@ -16,7 +16,9 @@
 
 body {
     margin: 0;
-    min-height: 100vh;
+    padding: 0;
+    height: 100vh;
+    box-sizing: border-box;
     font-family: "Space Grotesk", sans-serif;
     color: var(--text);
     background:
@@ -33,14 +35,12 @@ body {
         linear-gradient(155deg, var(--bg-1), var(--bg-2));
     display: grid;
     place-items: center;
-    padding: 1rem;
 }
 
 .app {
-    width: min(960px, 100%);
+    width: 100vw;
+    height: 100vh;
     text-align: center;
-    /* leave space for fixed header */
-    padding-top: 4.5rem;
 }
 
 h1 {
@@ -63,24 +63,23 @@ h1 {
 }
 
 .sim-card {
-    background: var(--panel);
-    border: 1px solid var(--panel-border);
-    border-radius: 26px;
-    /* remove inner padding so the canvas stretches to the card edges */
     padding: 0;
-    box-shadow: 0 20px 50px rgba(3, 10, 26, 0.55);
-    backdrop-filter: blur(7px);
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
 }
 
 #simCanvas {
     display: block;
-    width: 100%;
-    height: auto;
+    max-width: 100%;
+    max-height: 100%;
     aspect-ratio: 1 / 1;
     display: block;
-    border-radius: 20px;
     border: none;
-    background: rgba(130, 140, 150, 0.18); /* slightly grey canvas background */
+    border-radius: 18px;
 }
 
 .controls {
@@ -96,19 +95,22 @@ h1 {
     background: transparent;
 }
 
-button {
-    font: inherit;
-    font-weight: 700;
+.layover {
     background: linear-gradient(135deg, var(--accent), var(--accent-2));
-    color: var(--button-text);
     border: none;
     border-radius: 12px;
     padding: 1rem 1.8rem; /* larger button */
     font-size: 1.05rem;
+}
+
+button {
+    font: inherit;
+    font-weight: 700;
     cursor: pointer;
     transition:
         transform 160ms ease,
         filter 160ms ease;
+    color: var(--button-text);
 }
 
 button:hover {
@@ -121,11 +123,9 @@ button:active {
 }
 
 .readout {
-    font-size: 1.05rem;
-    color: var(--muted);
+    color: var(--button-text);
 }
 
 .readout strong {
-    margin-left: 0.35rem;
-    color: var(--text);
+   color: var(--button-text);
 }

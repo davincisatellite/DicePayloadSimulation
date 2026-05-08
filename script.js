@@ -173,17 +173,7 @@ const boundaryRadius = world.arenaRadius - world.diceRadius - 1.5;
 
 function drawSpaceBackdrop() {
     ctx.save();
-    const g = ctx.createRadialGradient(
-        world.cx,
-        world.cy,
-        90,
-        world.cx,
-        world.cy,
-        world.w * 0.55,
-    );
-    g.addColorStop(0, "#061337");
-    g.addColorStop(1, "#01050f");
-    ctx.fillStyle = g;
+    ctx.fillStyle = "#000000";
     ctx.fillRect(0, 0, world.w, world.h);
 
     for (let i = 0; i < 170; i += 1) {
@@ -440,8 +430,6 @@ function updateArm(dt) {
 
         Body.setPosition(arm.body, { x: nextX, y: nextY });
         Body.setAngle(arm.body, nextAngle);
-
-        console.log(`Arm velocity: (${velX.toFixed(2)}, ${velY.toFixed(2)})`);
 
         Body.setVelocity(arm.body, { x: velX, y: velY });
     } else {
