@@ -1,7 +1,6 @@
 const canvas = document.getElementById("simCanvas");
 const ctx = canvas.getContext("2d");
 const rollBtn = document.getElementById("rollBtn");
-const resultText = document.getElementById("resultText");
 
 const earthImage = new Image();
 // Prefer PNG then fall back to SVG
@@ -26,15 +25,14 @@ const world = {
     diceColors: ["#ffb000", "#fe6100", "#dc267f", "#785ef0", "#648fff"],
     diceRadius: 32,
     earthOrbitRadius: logicalSize * 0.48,
-    // slower orbit for a gentler rotation
     earthOrbitSpeed: 0.06,
     earthScale: 0.8,
     time: 0,
-    state: "idle",
-    rollEndAt: 0,
+    armMovementDuration: 2,
+    floatingDuration: 4,
+    armMovementUntil: 0,
     settleEndAt: 0,
     rollStart: 0,
-    allowFinalize: false,
     arm: {
         angle: 0,
         spinVel: 0,
@@ -98,9 +96,9 @@ for (let i = 0; i < diceCount; i += 1) {
     const y = world.cy + Math.sin(angle) * initialOrbit;
 
     const body = Bodies.rectangle(x, y, dieSize, dieSize, {
-        restitution: 0.88,
-        friction: 0.02,
-        frictionAir: 0.06,
+        restitution: 0.6,
+        friction: 0.0,
+        frictionAir: 0.0,
         density: 0.002,
     });
 
@@ -294,32 +292,14 @@ function applyMotion(dt) {
     // Step Matter engine (Engine.update expects ms)
     Engine.update(engine, dt * 1000);
 
-    if (world.state === "rolling" && now >= world.rollEndAt) {
-        world.state = "settling";
-    }
-
     if (now >= world.settleEndAt) {
-        world.allowFinalize = true;
-    }
-
-    if (world.allowFinalize && world.state !== "stopped") {
-        const calm = dice.every((d) => {
-            const v = d.body.velocity;
-            return (
-                Math.hypot(v.x, v.y) < 0.6 &&
-                Math.abs(d.body.angularVelocity) < 0.06
-            );
+        dice.map((d) => {
+            Matter.Body.setVelocity(d.body, { x: 0, y: 0 });
+            Matter.Body.setAngularVelocity(d.body, 0);
         });
-        const forcedTimeout = now >= world.settleEndAt + 5.0;
 
-        if (calm || forcedTimeout) {
-            world.state = "stopped";
-            let total = 0;
-            dice.forEach((die) => {
-                total += die.value;
-            });
-            resultText.textContent = `${dice.map((d) => d.value).join(" + ")} = ${total}`;
-        }
+        rollBtn.textContent = "Roll Again";
+        rollBtn.disabled = false;
     }
 
     updateFaceDisplays(now);
@@ -333,7 +313,7 @@ function updateFaceDisplays(now) {
     // Change face display frequency based purely on each die's linear speed.
     // High speed -> rapid random face changes. Low/standing still -> few or no changes.
     const minInterval = 0.04; // fastest change interval (sec)
-    const maxInterval = 0.8; // slowest change interval (sec)
+    const maxInterval = 2; // slowest change interval (sec)
     const maxSpeedForPips = 5.0;
     const stillThreshold = 0.001; // below this speed we consider the die "still"
 
@@ -417,7 +397,7 @@ function updateArm(dt) {
     const arm = world.arm;
     const halfLen = arm.length / 2;
 
-    if (world.time <= world.rollEndAt) {
+    if (world.time <= world.armMovementUntil) {
         const currentAngle = arm.body.angle;
         const nextAngle = currentAngle + arm.motorSpeed * dt;
 
@@ -425,8 +405,8 @@ function updateArm(dt) {
         const nextX = world.cx + Math.cos(nextAngle) * halfLen;
         const nextY = world.cy + Math.sin(nextAngle) * halfLen;
 
-        const velX = (nextX - arm.body.position.x) / dt / 100;
-        const velY = (nextY - arm.body.position.y) / dt / 100;
+        const velX = (nextX - arm.body.position.x) / dt / 50;
+        const velY = (nextY - arm.body.position.y) / dt / 50;
 
         Body.setPosition(arm.body, { x: nextX, y: nextY });
         Body.setAngle(arm.body, nextAngle);
@@ -450,12 +430,11 @@ function frame(ts) {
 }
 
 rollBtn.addEventListener("click", () => {
-    world.state = "rolling";
     world.rollStart = world.time;
-    world.rollEndAt = world.rollStart + 3.5;
-    world.settleEndAt = world.rollEndAt + 2.1;
-    world.allowFinalize = false;
-    resultText.textContent = "rolling...";
+    world.armMovementUntil = world.rollStart + world.armMovementDuration;
+    world.settleEndAt = world.armMovementUntil + world.floatingDuration;
+    rollBtn.textContent = "Rolling...";
+    rollBtn.disabled = true;
 });
 
 // removed automatic random scatter on load to avoid immediate ejection
